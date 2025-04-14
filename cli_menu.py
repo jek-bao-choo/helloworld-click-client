@@ -1,4 +1,4 @@
-# src/helloworld_click_client/menu.py
+# src/helloworld_click_client/cli_menu.py
 """
 Handles displaying the menu of available use cases and getting user selection.
 """

@@ -4,7 +4,7 @@ import sys
 import json
 
 # Direct imports for sibling modules
-import menu
+import cli_menu
 import sys_detect
 import cmd_run
 # Import specific functions directly from sibling modules
@@ -142,7 +142,7 @@ def cli_entry_point():
         system_info_json = "{}"
 
     # 2. Display Menu and Get Use Case
-    selected_product, selected_operation = menu.display_and_select_use_case()
+    selected_product, selected_operation = cli_menu.display_and_select_use_case()
     if not selected_product: # User chose to exit from menu
         click.echo("No use case selected. Exiting.")
         sys.exit(0)
