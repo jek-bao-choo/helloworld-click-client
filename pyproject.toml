@@ -1,0 +1,11 @@
+[project]
+name = "helloworld-click-client"
+version = "0.1.0"
+description = "Helloworld Click Client - Your AI-Powered Ops Assistant"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "click>=8.0",
+    # helloworld-agentic-middleware dependency if needed
+]
