@@ -1,38 +1,75 @@
-# src/helloworld_click_client/orchestrator_comm.py
-"""
-Handles direct communication with the helloworld-agentic-middleware logic
-by importing and calling its functions.
-"""
+# helloworld-click-client/orchestrator_comm.py
 import sys
-from typing import Optional
+import os
+import traceback # Import traceback module
+from typing import Optional, Callable
 
-# --- Direct Import Assumption ---
-# This assumes 'helloworld_agentic_middleware' package is available.
-# Adjust the import based on your actual project structure or installation method.
-try:
-    # Ensure the middleware's main processing function is correctly referenced
-    from helloworld_agentic_middleware.llm_workflow import handle_request as call_middleware_function
+# --- Dynamic Path Calculation (Keep this as is) ---
+_MIDDLEWARE_DIR_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'helloworld-agentic-middleware'))
 
-except ImportError as e:
-    print(f"CRITICAL ERROR: Could not import middleware function: {e}", file=sys.stderr)
-    print("Ensure 'helloworld-agentic-middleware' is installed or its 'src' directory is in PYTHONPATH.", file=sys.stderr)
-    # Define a dummy function to prevent NameError later, but signal failure
-    def call_middleware_function(*args, **kwargs):
-        print("Middleware function not available due to import error.", file=sys.stderr)
+# --- Helper Function to Import Middleware Logic (Modified for better error reporting) ---
+
+def _get_middleware_handle_request_func() -> Optional[Callable]:
+    """
+    Dynamically imports the 'handle_request' function from the middleware's
+    'llm_workflow' module by adding its directory to sys.path. Includes enhanced error reporting.
+
+    Returns:
+        The handle_request function object if successful, None otherwise.
+    """
+    # Ensure the calculated path is added to sys.path
+    if _MIDDLEWARE_DIR_PATH not in sys.path:
+        print(f"Info: Temporarily appending middleware path to sys.path: {_MIDDLEWARE_DIR_PATH}", file=sys.stderr)
+        sys.path.append(_MIDDLEWARE_DIR_PATH)
+
+    try:
+        # Debug: Print sys.path just before attempting import
+        # print(f"DEBUG: Attempting to import 'llm_workflow'. Current sys.path: {sys.path}", file=sys.stderr)
+
+        # Now try to import the specific module from the middleware
+        import llm_workflow
+        print(f"Info: Successfully imported llm_workflow from {_MIDDLEWARE_DIR_PATH}")
+
+        # Attempt to get the function from the imported module
+        handle_request_func = getattr(llm_workflow, 'handle_request', None)
+
+        if handle_request_func and callable(handle_request_func):
+            print(f"Info: Successfully imported 'handle_request' from {_MIDDLEWARE_DIR_PATH}/llm_workflow.py")
+            return handle_request_func
+        elif handle_request_func:
+            print(f"Error: Found 'handle_request' in '{_MIDDLEWARE_DIR_PATH}/llm_workflow.py', but it is not callable.", file=sys.stderr)
+            return None
+        else:
+             print(f"Error: Could not find 'handle_request' function within the imported 'llm_workflow' module from path: {_MIDDLEWARE_DIR_PATH}", file=sys.stderr)
+             return None
+
+    except ImportError as e:
+        print("-------------------- IMPORT ERROR DETECTED --------------------", file=sys.stderr)
+        print(f"Error: Could not import 'llm_workflow' module or one of its dependencies.", file=sys.stderr)
+        print(f"Attempted to load from: {_MIDDLEWARE_DIR_PATH}", file=sys.stderr)
+        print(f"Specific ImportError message: {e}", file=sys.stderr)
+        print("\n--- Full Traceback ---", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr) # <<< Print the full traceback
+        print("---------------------------------------------------------------", file=sys.stderr)
+        print("Suggestion: Check the traceback above for the exact line causing the import failure.", file=sys.stderr)
+        print("It might be within llm_workflow.py or a file it tries to import (e.g., llm_config, chatsend, etc.).", file=sys.stderr)
+        print("Ensure all necessary files exist in the middleware directory and have no syntax errors.", file=sys.stderr)
         return None
-    # Or consider exiting immediately:
-    # sys.exit("Middleware dependency missing.")
+    except Exception as e:
+        # Catch other potential errors during import/getattr
+        print("-------------------- UNEXPECTED ERROR DURING IMPORT --------------------", file=sys.stderr)
+        print(f"Error dynamically importing middleware function: {type(e).__name__}: {e}", file=sys.stderr)
+        print("\n--- Full Traceback ---", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr) # <<< Print the full traceback
+        print("-----------------------------------------------------------------------", file=sys.stderr)
+        return None
 
-except AttributeError:
-    print(f"CRITICAL ERROR: Could not find 'handle_request' function in helloworld_agentic_middleware.llm_workflow.", file=sys.stderr)
-    def call_middleware_function(*args, **kwargs):
-         print("Middleware function not available due to attribute error.", file=sys.stderr)
-         return None
-    # sys.exit("Middleware function signature mismatch or missing.")
-
+# --- Get the function object once when this module is loaded ---
+# (Keep this as is)
+_middleware_func: Optional[Callable] = _get_middleware_handle_request_func()
 
 # --- Communication Function ---
-
+# (Keep the rest of the file, including call_llm_workflow, as is)
 def call_llm_workflow(
     product: str,
     operation: str,
@@ -40,53 +77,32 @@ def call_llm_workflow(
     msg: Optional[str] = None,
     system_info_json: Optional[str] = None
 ) -> Optional[str]:
-    """
-    Directly calls the imported function from the agentic middleware.
-
-    Args:
-        product: The target product.
-        operation: The operation to perform.
-        mode: The interaction mode ('execute', 'fix', 'chat').
-        msg: Optional message (chat, error details, command output context).
-        system_info_json: JSON string containing detected system information.
-
-    Returns:
-        The raw response string from the middleware, or None on error.
-    """
-    if call_middleware_function is None : # Check if import failed
+    if _middleware_func is None:
+        print("Error: Middleware function could not be loaded. Cannot communicate.", file=sys.stderr)
         return None
 
-    # --- Prepare Message Payload ---
-    # The middleware's handle_request expects a single 'msg'.
-    # Prepend system info JSON string to the actual message/context.
     final_message = ""
-    if system_info_json and system_info_json != "{}": # Avoid sending empty JSON
+    if system_info_json and system_info_json != "{}":
         final_message += f"System Information:\n```json\n{system_info_json}\n```\n---"
     if msg:
-        if final_message: # Add separator if system info was added
+        if final_message:
             final_message += "\nUser Context/Message:\n"
         final_message += msg
     elif not final_message:
-        # Ensure msg is not None if no system info and no user message
-        final_message = "Initial request." # Or some default if needed by middleware
+        final_message = "Initial request."
 
     try:
-        # Directly call the imported function.
-        # ASSUMPTION: The middleware's handle_request function has the signature:
-        # handle_request(product: str, operation: str, target: str, mode: str, msg: Optional[str])
-        # We provide a placeholder 'target' or modify middleware if 'target' isn't needed for direct calls.
-        response = call_middleware_function(
+        # Pass target='local' or 'openrouter' as appropriate, or modify middleware if not needed
+        response = _middleware_func(
             product=product,
             operation=operation,
-            target='direct_call', # Indicate communication method, or make optional in middleware
+            target='local', # Example: Decide target here or modify middleware
             mode=mode,
             msg=final_message
         )
-        return response # Return the raw string response
+        return response
 
     except Exception as e:
-        print(f"Error during direct call to middleware function: {type(e).__name__}: {e}", file=sys.stderr)
-        # You might want to capture more details from the exception traceback here
-        # import traceback
-        # print(traceback.format_exc(), file=sys.stderr)
+        print(f"Error during call to dynamically imported middleware function: {type(e).__name__}: {e}", file=sys.stderr)
+        # traceback.print_exc(file=sys.stderr) # Uncomment for more debug info if needed later
         return None

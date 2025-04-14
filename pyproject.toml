@@ -8,4 +8,5 @@ license = { text = "MIT" }
 dependencies = [
     "click>=8.0",
     # helloworld-agentic-middleware dependency if needed
+    "litellm>=1.66.0",
 ]
