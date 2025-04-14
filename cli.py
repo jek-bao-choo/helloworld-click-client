@@ -2,7 +2,6 @@
 import click
 import sys
 import json
-import re # Keep re import
 
 # Direct imports for sibling modules
 import menu
@@ -33,7 +32,7 @@ def _handle_no_code_blocks():
         next_mode = 'chat'
         return next_mode, next_message, False # exit_flag=False
 
-def _handle_command_confirmation(code_block, product, operation, system_info_json):
+def _handle_command_confirmation(code_block):
     """
     Handles asking the user to confirm command execution, runs the command
     if confirmed, and determines the next state based on the outcome.
@@ -167,9 +166,6 @@ def cli_entry_point():
             system_info_json=system_info_json
         )
 
-        # Reset message for the next loop iteration
-        user_message = None
-
         # Handle communication failure
         if llm_response is None:
             click.secho("Error: Failed to get response from orchestrator. Cannot continue.", fg='red', err=True)
@@ -191,10 +187,7 @@ def cli_entry_point():
             # Code Blocks Found Path - handle the first one
             # Pass necessary context to the handler
             current_mode, user_message, exit_app = _handle_command_confirmation(
-                code_blocks[0], # Process first block
-                selected_product,
-                selected_operation,
-                system_info_json
+                code_blocks[0] # Process first block
             )
         # Loop continues with updated mode, message, or exits
 
