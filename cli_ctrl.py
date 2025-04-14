@@ -1,4 +1,4 @@
-# src/helloworld_click_client/cli.py -> cli.py
+# src/helloworld_click_client/cli_ctrl.py -> cli_ctrl.py
 import click
 import sys
 import json
